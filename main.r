@@ -219,7 +219,7 @@ print('>> Matching feature files and count files')
 print('>> Will Initiate analysis')
 
 # Main -----------------------
-
+analysis_type <- ifelse(z_transform,'z_transform','relative.freqs')
 keepgenes <- c()
 cmap <- c()
 
@@ -262,6 +262,13 @@ if (!(is.null(dge_pth))) {
     print('>> Specify at least one set of genes to plot (lFC >0 or lFC <0')
     print('>> Exiting')
     quit(status = 1)
+  
+  # name of analysis
+  bname <- gsub("\\.tsv","",basename(genes_pth))
+  # save result to png-file
+  imgpth <- paste(c(dirname(genes_pth),paste(c(bname,analysis_type,"count_by_distance.png"),collapse = '.')),collapse = '/')
+    
+  
   }
     
   genes <- genes[keepgenes,]
@@ -286,6 +293,12 @@ if (!(is.null(dge_pth))) {
           multiVals="first")
   
   symbol <- use_genes
+  odir <- paste(c(getwd(),'exprbydist'), collapse = "/")
+  if (!(dir.exists(odir))) {
+    dir.create(odir)
+  }
+  bname <- paste(c("custom_geneset",round(runif(1)*100000)), collapse = "_")
+  imgpth <- paste(c(dirname(genes_pth),paste(c(bname,analysis_type,"count_by_distance.png"),collapse = '.')),collapse = '/')
 }
 
 print('>> using genes ')
@@ -394,12 +407,7 @@ if (z_transform) {
   dataf <- apply(dataf,2,scale)
 }
 
-# name of analysis
-bname <- gsub("\\.fancy\\.tsv","",basename(genes_pth))
-print(paste(c(dirname(genes_pth),paste(c(bname,"count_by_distance.png"),collapse = '.')),collapse = '/'))
-analysis_type <- ifelse(z_transform,'z_transform','relative.freqs')
-# save result to png-file
-png(paste(c(dirname(genes_pth),paste(c(bname,analysis_type,"count_by_distance.png"),collapse = '.')),collapse = '/'),
+png(imgpth,
     width = 1000,
     height = 500)
 
