@@ -150,17 +150,15 @@ if (interactive()) {
   # example set when running in interactive mode to test performance
   # ajdust paths to make compatible with local version
   
-  st_cnt_files <- c('/home/alma/ST-2018/CNNp/DGE/data/count_data/her2nonlum/count_data-23567_D2.tsv',
-                    '/home/alma/ST-2018/CNNp/DGE/data/count_data/her2nonlum/count_data-23567_E2.tsv',
-                    '/home/alma/ST-2018/CNNp/DGE/data/count_data/her2nonlum/count_data-23567_E1.tsv')
+  st_cnt_files <- c('exdata/st-00001_X1.tsv',
+                    'exdata/st-00001_X2.tsv',
+                    'exdata/st-00001_X3.tsv')
   
-  feat_files <- c('/home/alma/ST-2018/CNNp/DGE/data/curated_feature_files/her2nonlum/23567_D2.feature_file.tsv',
-                  '/home/alma/ST-2018/CNNp/DGE/data/curated_feature_files/her2nonlum/23567_E2.feature_file.tsv',
-                  '/home/alma/ST-2018/CNNp/DGE/data/curated_feature_files/her2nonlum/23567_E1.feature_file.tsv')
+  feat_files <- c('exdata/ft-00001_X1.tsv',
+                  'exdata/ft-00001_X2.tsv',
+                  'exdata/ft-00001_X3.tsv')
 
-  #dge_pth <- '/home/alma/ST-2018/CNNp/DGE/res/DGEresults2/section_and_zone_within_subtype_new_d2/her2nonlum/DGE_analysis.2019-03-19-15-11-50.64798.tme_vs_tumor.fancy.tsv'
   dge_pth <- NULL
-  
   polydeg <- 5
   loess_span <- 0.5
   outer_tag <- 'non'
