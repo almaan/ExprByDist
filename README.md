@@ -11,10 +11,16 @@ You can specify explicity genes which you want to study using the command "--gen
 runs easier, the genes will have the same color in any run independent of the gene set, the color is given as a function of the ENSEMBL id. As an alternative to specifying genes, one can use the genes
 identified as DE from differential expression analysis, then using "--dge\_res path\_to\_dge\_analysis\_results.tsv" as input.
 
-Additional to a list of genes or DE results specifying the genes to be studied, two set of files are **necessary** for the analysis to work; The feature files containing the annotation of each spot as
-"tumor" or "non" and the expression count matrices, with spots as rows and genes as columns. Multiple sections can be included in the analysis (and this is recommended), meaning that multiple count
-matrices as feature files should be included, if such is the case then these should be matched in order meaning that if the feature file of section X is passed as the n:th feature file then the count
-matrix of section X should be passed as the n:th count matrix as well. If the naming convetion of five digits followed by an underscore and a section identifier (letter + digit) is used, proper order
+Additional to a list of genes or DE results specifying the genes to be studied, two set of files are **necessary** for the analysis to work; 
+
+1. The feature files containing the annotation of each spot as "tumor" or "non"
+2. The expression count matrices, with spots as rows and genes as columns.
+
+Multiple sections can be included in the analysis (this is recommended), meaning that several count matrices as feature files should be included (one pair for each section). When such is the case then the feature matrices and count matrices should
+be matched w.r.t. to order. Meaning that if the feature file of section X is passed as the n:th feature file then the count
+matrix of section X should be passed as the n:th count matrix.
+
+If the naming convetion of five digits followed by an underscore and a section identifier (letter + digit) is used, proper order
 will be controlled for unless you disable it with "--no\_control"; use this flag if another naming convention of the sections is used.
 
 ## Examples
