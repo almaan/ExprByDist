@@ -21,22 +21,20 @@ will be controlled for unless you disable it with "--no\_control"; use this flag
 
 Three "anonymized" sections with count data and feature files are included in the folder "exdata" which can be used to test the tool. Running the following command
 
-´´´bash
+```bash
 ./main.r --genes "ERBB2" "MZB1" "C3" "CD46"  -f exdata/ft* -c exdata/st*
-´´´
+```
 
 Will  generate the following image
 
-![Image of run 1]
-(https://github.com/almaan/ExprByDist/blob/master/img/custom_geneset_20190405175426.relative.freqs.count_by_distance.png?raw=true)
+![Image of run 1](https://github.com/almaan/ExprByDist/blob/master/img/custom_geneset_20190405175426.relative.freqs.count_by_distance.png?raw=true)
 
-´´´bash
+```bash
 ./main.r --dge_res exdata/dge_res.tsv  -f exdata/ft* -c exdata/st* --positive_lfc --negative_lfc
-´´´
+```
 
 Will generate the following image
 
-![Image of run 2]
-(https://github.com/almaan/ExprByDist/blob/master/img/dge_res.relative.freqs.count_by_distance.png.count_by_distance.png?raw=true)
+![Image of run 2](https://github.com/almaan/ExprByDist/blob/master/img/dge_res.relative.freqs.count_by_distance.png.count_by_distance.png?raw=true)
 
 Multiple other features are available, to use ./main.r --help to get more information
