@@ -1,11 +1,29 @@
 #!/usr/bin/Rscript
 
-library(spatstat)
-library(optparse)
-library(org.Hs.eg.db)
-library(AnnotationDbi)
-
+sh <- suppressPackageStartupMessages
+sh(library(spatstat))
+sh(library(optparse))
+sh(library(org.Hs.eg.db))
+sh(library(AnnotationDbi))
+sh(library(ggplot2))
+sh(library(reshape2))
 # Functions -----------------------------
+
+ensg_to_rgb <- function(ensgid) {
+  #' Assigns a color for each
+  #' ENSEMBL-id to make 
+  #' plots comparable. Uniqueness is not
+  #' guaranteed but large variation between
+  #' genes are usually observed
+
+  num <- gsub('ENSG','',ensgid)
+  num <- as.numeric(gsub('^0*','',num))
+  rr <- (num %% 255 ) / 255
+  gg <- ((num / 6) %% 255 ) / 255
+  bb <- ((num / 7) %% 255 ) / 255
+  rgbval <- rgb(r = rr, g = gg, b = bb)
+  return(rgbval)
+}
 
 # Wrapper for multiple argument parsing -----------------
 
@@ -275,34 +293,48 @@ if (!(is.null(dge_pth))) {
   genes <- genes$genes # get ENSEMBL ids
   genes <- genes[!(is.na(genes))] # remove any potential NA
 
-  symbol <- mapIds(org.Hs.eg.db,
-                   keys=as.character(genes),
-                   column="SYMBOL",
-                   keytype="ENSEMBL",
-                   multiVals="first")
-    
+  if (any(grepl('ENSG',genes))) {
+    symbol <- mapIds(org.Hs.eg.db,
+                     keys=as.character(genes),
+                     column="SYMBOL",
+                     keytype="ENSEMBL",
+                     multiVals="first")
+  } else {
+    symbol <- genes
+  }
+  
+  dropgenes <- which(is.na(genes) | is.na(symbol))
+  symbol <- symbol[-dropgenes]
+  genes <- genes[-dropgenes]
+      
 } else if (!(is.null(use_genes))) {
   genes <- use_genes
-  grgb <- replicate(3,runif(length(genes)))
-  cmap <- c(cmap,rgb(grgb))
   
-  genes <- mapIds(org.Hs.eg.db,
+  genes <-mapIds(org.Hs.eg.db,
           keys=as.character(genes),
           column="ENSEMBL",
           keytype="SYMBOL",
           multiVals="first")
   
   symbol <- use_genes
+  genes <- genes[!(is.na(genes))]
+  symbol <- symbol[!(is.na(genes))]
+  
+  grgb <- unlist(lapply(genes,ensg_to_rgb))
+  cmap <- c(cmap,grgb)
+  
   odir <- paste(c(getwd(),'exprbydist'), collapse = "/")
   if (!(dir.exists(odir))) {
     dir.create(odir)
   }
-  bname <- paste(c("custom_geneset",round(runif(1)*100000)), collapse = "_")
-  imgpth <- paste(c(dirname(genes_pth),paste(c(bname,analysis_type,"count_by_distance.png"),collapse = '.')),collapse = '/')
+  bname <- paste(c("custom_geneset",gsub(' |:|-','',as.character(Sys.time()))), collapse = "_")
+  imgpth <- paste(c(odir,paste(c(bname,analysis_type,"count_by_distance.png"),collapse = '.')),collapse = '/')
 }
 
-print('>> using genes ')
+
+print(sprintf('>> The following genes %d genes',length(genes)))
 print(genes)
+
 mx <- 50 #  maximum distance from distance from tumor spot
 dr <- 0.1 #  distance increment
 lims <- seq(1-dr,mx+dr,dr) #  lower limits
@@ -314,10 +346,6 @@ data <- data.frame(matrix(0,ncol = length(genes), nrow = length(datanames)),
                    row.names = datanames)
 colnames(data) <- genes
 
-
-# if symbols are not found use ENSEMBL id
-symbol[is.na(symbol)] <- genes[is.na(symbol)]
-
 # iterate over all files
 for (filenum in c(1:length(st_cnt_files))){
   
@@ -327,11 +355,10 @@ for (filenum in c(1:length(st_cnt_files))){
   feat <- read.table(feat_pth, sep = '\t', header = 1, row.names = 1, stringsAsFactors = F)
   
   cnt_raw <- read.table(st_cnt_pth, sep = '\t', header = 1, row.names = 1, stringsAsFactors = F)
+  
   # Remove bias due to spot library size
   cnt_raw <- sweep(cnt_raw, MARGIN = 1, FUN = "/", rowSums(cnt_raw))
-  # Remove bias due to gene expression levels, using relative frequencies
-  #cnt_raw <- sweep(cnt_raw, MARGIN = 2, FUN = '/', colSums(cnt_raw))
-  
+
   # extract spots present in feature and count file
   interspt <- as.character(intersect(rownames(feat),rownames(cnt_raw)))
   cnt_raw <- cnt_raw[interspt,]
@@ -343,8 +370,11 @@ for (filenum in c(1:length(st_cnt_files))){
   rownames(cnt) <- interspt
   
   # interection of genelist and genes in st-count data
-  inter <- as.character(intersect(genes,colnames(cnt_raw)))
-  
+  if (sum(grepl('ENSG',colnames(cnt_raw))) > 0.5 * ncol(cnt_raw)) {
+    inter <- as.character(intersect(genes,colnames(cnt_raw)))
+  } else {
+    inter <- as.character(intersect(symbols,colnames(cnt_raw)))
+  }
   # fill count matrix with scaled st-counts
   cnt[,inter] <- cnt_raw[,inter]
   remove(cnt_raw) # to free up space
@@ -389,14 +419,9 @@ for (filenum in c(1:length(st_cnt_files))){
   }
 
 }
-print(data)
 # adjust for multiple sections having been used
 dataf <- data / length(st_cnt_files)
 keepdist <- as.vector(which(rowSums(data) > 0, useNames = F))
-keepdist <- c(ifelse(lims[keepdist[1]] > lims[1],keepdist[1]-1,c()),
-              keepdist,
-              ifelse(as.numeric(datanames[keepdist[length(keepdist)]] )< as.numeric(datanames[length(datanames)]),keepdist[length(keepdist)] + 1, c()))
-
 # remove genes and distances where no observetions are made
 dataf <- dataf[keepdist,colSums(data) > 0]
 # remove distances where no spots are present
@@ -411,8 +436,6 @@ png(imgpth,
     width = 1000,
     height = 500)
 
-# panel for plot and legend
-par(mfrow=c(1,2))
 # get plot title
 if (is.null(main_title)) {
   plt_title <- gsub('DGE_analysis\\.','',bname)
@@ -430,54 +453,27 @@ dataf <- sweep(dataf, FUN = '/', MARGIN = 2, (cmx-cmn))
 
 xmin <- min(as.numeric(datanamesf))
 xmax <- max(as.numeric(datanamesf))
-# initiate plot
-plot(as.numeric(datanamesf),dataf[,1],
-   #  ylim = c(ifelse(z_transform,(min(dataf)-10),0), max(dataf + 1)),
-     #ylim = c(0, (max(dataf) + max(dataf)*0.2)),
-     ylim = c(-0.15,1.15),
-     xlim = c(xmin - 0.5,xmax+0.5),
-     xlab = paste(c(outer_tag, 'distance to nearest', inner_tag, 'spot'), collapse = ' '),
-     ylab = 'mean expression',
-     col = cmap[1],
-     main = plt_title,
-     cex.main = 0.9,
-     pch = 19
-     )
 
-# add points for all genes
-for (ii in 2:(ncol(dataf))) {
-  points(x= as.numeric(datanamesf), dataf[,ii], col = cmap[ii], pch = 19)
-}
+colnames(dataf) <- symbol
+dataf$average <- rowMeans(dataf)
+cmap <- c(as.character(cmap),'#000000')
+dataf$distance <- as.numeric(rownames(dataf))
+data_long <- melt(dataf, id="distance")
+data_long$value <- as.numeric(data_long$value)
+colnames(data_long)[grepl('variable',colnames(data_long))] <- 'gene'
+colnames(data_long)[grepl('value',colnames(data_long))] <- 'expression'
 
-# add fitted curves for each gene using same color as points
-fitted <- list()
-if (method == 'loess'){
+viz <- ggplot(data = data_long, aes(x = distance, y = expression, color = gene)) +
+       ggtitle(plt_title) +
+       annotate('rect', xmin = -Inf, xmax = 0, ymin = -Inf, ymax = Inf, fill = "red", color = NA, alpha = 0.1) + 
+       annotate('rect', xmin = 0, xmax = Inf, ymin = -Inf, ymax = Inf, fill = "green", color = NA, alpha = 0.1) +
+       geom_smooth(method=lm, alpha = 0.2,formula = y ~ poly(x, polydeg, raw=TRUE)) +
+       geom_point()  +
+       scale_color_manual(values=cmap) +
+       xlab('Distance') +
+       ylab('Relative Expression') +
+       theme(plot.title = element_text(hjust = 0.5))
 
-  for (ii in c(1:ncol(dataf))) {
+print(viz)
 
-    fitted[[genes[ii]]] <- loess(y ~ x,
-                                 data = data.frame(x = as.numeric(datanamesf), # distance is independent variable
-                                                   y = dataf[,ii]), # mean expression is dependent variable
-                                 span = loess_span)
-    
-    lines(datanamesf, predict(fitted[[genes[ii]]], data.frame(x=as.numeric(datanamesf))), col=cmap[ii], lwd = 5)
-    
-  }
-  
-} else if (method == 'polynomial') {
-  for (ii in c(1:ncol(dataf))) {
-    # using polynomial of degree "polydeg" to fit data
-    fitted[[genes[ii]]] <- lm(formula = y ~ poly(x, polydeg, raw=TRUE),
-                              data = data.frame(x = as.numeric(datanamesf), # distance is independent variable
-                                                y = dataf[,ii]) # mean expression is dependent variable
-                              )
-    
-    lines(as.numeric(datanamesf), predict(fitted[[genes[ii]]], data.frame(x=datanamesf)), col=cmap[ii], lwd = 5)
-  }
-}
-
-# plot legend in different subplot for readability
-plot(x=NULL, xlim = c(0,2), ylim = c(0,1), xlab = '', ylab = '')
-legend(0,1,legend= c(symbol), fill = cmap, cex = 0.5, bty = 'n', ncol = 5  )
 dev.off()
-
