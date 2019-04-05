@@ -13,8 +13,8 @@ identified as DE from differential expression analysis, then using "--dge\_res p
 
 Additional to a list of genes or DE results specifying the genes to be studied, two set of files are **necessary** for the analysis to work; 
 
-1. The feature files containing the annotation of each spot as "tumor" or "non"
-2. The expression count matrices, with spots as rows and genes as columns.
+1. The feature files containing the annotation of each spot as "tumor" or "non". Look at the files exdata/ft\_00001\_X1.tsv for an example of what data should be included and the structure of it.
+2. The expression count matrices, with spots as rows and genes as columns. Look at the files exdata/st\_00001\_X1.tsv for an example of what data should be included and the structure of it.
 
 Multiple sections can be included in the analysis (this is recommended), meaning that several count matrices as feature files should be included (one pair for each section). When such is the case then the feature matrices and count matrices should
 be matched w.r.t. to order. Meaning that if the feature file of section X is passed as the n:th feature file then the count
@@ -43,4 +43,11 @@ Will generate the following image
 
 ![Image of run 2](https://github.com/almaan/ExprByDist/blob/master/img/dge_res.relative.freqs.count_by_distance.png.count_by_distance.png?raw=true)
 
-Multiple other features are available, to use ./main.r --help to get more information
+When --dge\_res is used rather than when specifying genes explicitly, thoes genes with a positive logFoldChange will be colored in red whilst those with a negative logFoldChange are colored in blue.
+
+For each analysis a bar-plot giving the total number of spots found at each of the distances are generated as well; it's recommended to inspect these to make sure that observed patterns have actual
+support from several spots and are not just random noise. One example of said bar-plot for the last run above is
+
+![Barplot of run 2](https://github.com/almaan/ExprByDist/blob/master/img/dge_res.relative.freqs.count_by_distance.png.spot_distribution.png?raw=true)
+
+Additional features do exists, use ./main.r --help to get more information regarding these
