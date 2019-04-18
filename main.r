@@ -306,6 +306,7 @@ analysis_type <- ifelse(z_transform,'z_transform','relative.freqs')
 keepgenes <- c()
 cmap <- c()
 
+# if a dge-file is provided
 if (!(is.null(dge_pth))) {
   flog.info('Use Gene-Set and foldChange based on DE-results')
   # load genes to be used in analysis 
@@ -370,6 +371,7 @@ if (!(is.null(dge_pth))) {
   symbol <- symbol[-dropgenes]
   genes <- genes[-dropgenes]
       
+# if gene symbols are provided
 } else if (!(is.null(use_genes))) {
   genes <- use_genes
   
@@ -400,7 +402,7 @@ if (!(is.null(dge_pth))) {
   imgpth <- paste(c(odir,paste(c(bname,analysis_type),collapse = '.')),collapse = '/')
 }
 
-mx <- 50 #  maximum distance from distance from tumor spot
+mx <- 60 #  maximum distance from distance from tumor spot
 dr <- 0.1 #  distance increment
 lims <- seq(1-dr,mx+dr,dr) #  lower limits
 meanpnt <- lims + dr/2.0 #  mean point within each interval
@@ -421,7 +423,7 @@ data <- data.frame(matrix(0,
 colnames(spotcount) <- 'n_spots'
 colnames(data) <- genes
 
-# iterate over all files
+# iterate over all filenames
 flog.info('Read data from files')
 for (filenum in c(1:length(st_cnt_files))){
   
@@ -434,9 +436,14 @@ for (filenum in c(1:length(st_cnt_files))){
   
   feat <- read.table(feat_pth, sep = '\t', header = 1, row.names = 1, stringsAsFactors = F)
   
-  cnt_raw <- read.table(st_cnt_pth, sep = '\t', header = 1, row.names = 1, stringsAsFactors = F)
+  # raw count matrix; n_spots x n_genes
+  cnt_raw <- read.table(st_cnt_pth,
+                        sep = '\t',
+                        header = 1,
+                        row.names = 1,
+                        stringsAsFactors = F)
   
-  # Remove bias due to spot library size
+  # Remove bias due to spot library size; divide row by rowsum
   cnt_raw <- sweep(cnt_raw, MARGIN = 1, FUN = "/", rowSums(cnt_raw))
 
   # extract spots present in feature and count file
@@ -460,20 +467,24 @@ for (filenum in c(1:length(st_cnt_files))){
   
   # fill count matrix with scaled st-counts
   cnt[,inter] <- cnt_raw[,inter]
-  remove(cnt_raw) # to free up space
+  remove(cnt_raw) # free up memory
   
   # get tumor and non-tumor spot coordinates
-  innerspts <- feat[feat$tumor == inner_tag,c('xcoord','ycoord')]
-  outerspts <- feat[feat$tumor == outer_tag,c('xcoord','ycoord')]
+  innerspts <- feat[feat$tumor == inner_tag,c('xcoord','ycoord')] # within reference tissue
+  outerspts <- feat[feat$tumor == outer_tag,c('xcoord','ycoord')] # outside referene tissue
   
   # create distance matrix (euclidian distance)
-  dmat = crossdist.default(X = outerspts[,1], Y = outerspts[,2], x2 = innerspts[,1], y2 = innerspts[,2])
+  dmat = crossdist.default(X = outerspts[,1], # target spots along dim 1
+                           Y = outerspts[,2],
+                           x2 = innerspts[,1], # reference spots along dim 2
+                           y2 = innerspts[,2])
+  
   rownames(dmat) = rownames(outerspts)
   colnames(dmat) = rownames(innerspts)
   
   # get minimum distance to a tumor spot for each non-tumor spot
-  mindist_ref <- apply(dmat, 2, min)
-  mindist_trgt <- apply(dmat, 1, min)
+  mindist_ref <- apply(dmat, 2, min) # minimum distance to nearest target spot for all reference spots
+  mindist_trgt <- apply(dmat, 1, min) # minimum distance to nearest reference spot for all target spots
   
   # get expression levels for spots within reference tissue
   for (jj in c(1:length(lims))) {
@@ -507,7 +518,10 @@ for (filenum in c(1:length(st_cnt_files))){
 
 # adjust for multiple sections having been used
 dataf <- data / length(st_cnt_files)
+
+# get distances where 0 counts are observed
 keepdist <- as.vector(which(rowSums(data) > 0, useNames = F))
+# if bad gene set
 if (length(keepdist) == 0) {
   flog.error('None of the selected genes were observed in any of the sections')
   flog.error('Exiting')
@@ -518,18 +532,20 @@ flog.info(sprintf('%d distances have at least one observed count of selected gen
 dataf <- dataf[keepdist,colSums(data) > 0]
 symbol <- symbol[colSums(data) >0]
 genes <- genes[colSums(data) >0]
-# remove distances where no spots are present
-meanpntf <- meanpnt[keepdist]
+# remove "empty" distances
+meanpntf <- meanpnt[keepdist] 
 datanamesf <- datanames[keepdist]
 spotcount$distance <- as.numeric(rownames(spotcount))
 spotcountf <- spotcount[keepdist,]
 
 # perform z-transform
+# TODO: Needs to be looked over
 if (z_transform) {
   flog.info('Z-transform data')
   dataf <- apply(dataf,2,scale)
 }
 
+# Plot Results -------------------------
 png(paste(c(imgpth,"count_by_distance.png"),collapse = '.'),
     width = 1000,
     height = 500)
@@ -541,27 +557,38 @@ if (is.null(main_title)) {
   plt_title <- main_title
 }
 
-# Plot Results -------------------------
-
+# if loess is specified
 if (method == 'loess') {
   flog.info(sprintf('Using Loess Smoothing with span %f', loess_span))
   smooth_method <- loess
   formula <- y ~ x
+  
+# default to polynomial if loess is not specified
 } else {
   flog.info(sprintf("Using Polynomial of degree %d for Smoothing",polydeg))
   smooth_method <- lm
   formula <-  y ~ poly(x, polydeg, raw=TRUE)  
 }
 
-cmx <- apply(dataf,2,max)
-cmn <- apply(dataf,2,min)
+cmx <- apply(dataf,2,max) # max value for each gene 
+cmn <- apply(dataf,2,min) # min value for each gene
+
+# transform expression levels to unit interval within each gene
+# to allow for easier comparision
+
 dataf <- sweep(dataf, FUN = '-', MARGIN = 2, cmn)
 dataf <- sweep(dataf, FUN = '/', MARGIN = 2, (cmx-cmn))
 
 colnames(dataf) <- symbol
+
+# add average expression  for reference to dataframe 
 dataf$average <- rowMeans(dataf)
+# set color to be black for reference 
 cmap <- c(as.character(cmap),'#000000')
+# add distance as a column; for melting
 dataf$distance <- as.numeric(rownames(dataf))
+
+# reformat data to be compatible with ggplot
 data_long <- melt(dataf, id="distance")
 data_long$value <- as.numeric(data_long$value)
 colnames(data_long)[grepl('variable',colnames(data_long))] <- 'gene'
