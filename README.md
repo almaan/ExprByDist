@@ -3,9 +3,9 @@
 A simple CLI based implementation which allows one to plot the gene expression as a function of the distance to a given feature. The current application is implemented with the intentio to be used for
 cancer samples. The main plot will on the right hand side (positive) have the expression of genes given as a function of the distance to the _nearest_ tumor spot whilst the left hand side (negative) will
 plot the expression of the same gene as a function of the distance to the neares non-tumor spot. To clearly illustrate which values are calculated within the tumor these are plotted over a red
-background whilst those outside are plotted over a green background. Smoothing using either polynomial of a specified degree or the standard loess will be used, with default being a polynomial of
-degree 5.
-
+background whilst those outside are plotted over a green background. The smoothed curves are prodcued by fitting a gaussian process (GP) to the observed count data (normalized within each spot as to
+be represented in terms of relative frequencies). The predicted mean value is visualized with an error bars indicating +/- 2sd. The fitting is performed using kernlab's *gausspr* with default
+settings.
 
 You can specify explicity genes which you want to study using the command "--genes GENE1 GENE2 GENE3", where each of the genes will be plotted in the same graph. To make comparisions between different
 runs easier, the genes will have the same color in any run independent of the gene set, the color is given as a function of the ENSEMBL id. As an alternative to specifying genes, one can use the genes
@@ -33,7 +33,7 @@ Three "anonymized" sections with count data and feature files are included in th
 
 Will  generate the following image
 
-![Image of run 1](https://github.com/almaan/ExprByDist/blob/master/img/custom_geneset_20190405175426.relative.freqs.count_by_distance.png?raw=true)
+![Image of run 1](https://github.com/almaan/ExprByDist/blob/master/img/custom.png?raw=true)
 
 ```bash
 ./main.r --dge_res exdata/dge_res.tsv  -f exdata/ft* -c exdata/st* --positive_lfc --negative_lfc
@@ -41,13 +41,8 @@ Will  generate the following image
 
 Will generate the following image
 
-![Image of run 2](https://github.com/almaan/ExprByDist/blob/master/img/dge_res.relative.freqs.count_by_distance.png.count_by_distance.png?raw=true)
+![Image of run 2](https://github.com/almaan/ExprByDist/blob/master/img/dge_res.png?raw=true)
 
 When --dge\_res is used rather than when specifying genes explicitly, thoes genes with a positive logFoldChange will be colored in red whilst those with a negative logFoldChange are colored in blue.
-
-For each analysis a bar-plot giving the total number of spots found at each of the distances are generated as well; it's recommended to inspect these to make sure that observed patterns have actual
-support from several spots and are not just random noise. One example of said bar-plot for the last run above is
-
-![Barplot of run 2](https://github.com/almaan/ExprByDist/blob/master/img/dge_res.relative.freqs.count_by_distance.png.spot_distribution.png?raw=true)
 
 Additional features do exists, use ./main.r --help to get more information regarding these
