@@ -137,6 +137,13 @@ parser <- add_option(parser,
 #)
 
 parser <- add_option(parser,
+                     c("-l","--logarithm"),
+                     default = F,
+                     action = 'store_true',
+                     help = "log-transform the (relative) frequencies."
+)
+
+parser <- add_option(parser,
                      c("-t","--title"),
                      default = NULL,
                      help = glue(c('title of plot',
@@ -238,6 +245,7 @@ if (interactive()) {
   positive_lfc <- T
   negative_lfc <- T
  # method = 'loess'
+  use.log <- FALSE
   main_title <- "test"
   use_genes <- c("ERBB2","MZB1")
 #  use_standard_error <- T
@@ -253,6 +261,7 @@ if (interactive()) {
   dge_pth <- args$dge_res
   genes_pth <- args$dge_res
  # polydeg <- args$polydeg
+  use.log <- args$log
   main_title <- args$title
   outer_tag <- args$outer_tag
   inner_tag <- args$inner_tag
@@ -428,14 +437,17 @@ for (filenum in c(1:length(st_cnt_files))){
   feat <- read.table(feat_pth, sep = '\t', header = 1, row.names = 1, stringsAsFactors = F)
   
   # raw count matrix; n_spots x n_genes
-  cnt_raw <- read.table(st_cnt_pth,
+  cnt_raw <- as.matrix(read.table(st_cnt_pth,
                         sep = '\t',
                         header = 1,
                         row.names = 1,
-                        stringsAsFactors = F)
+                        stringsAsFactors = F))
   
-  # Remove bias due to spot library size; divide row by rowsum
-  cnt_raw <- sweep(cnt_raw, MARGIN = 1, FUN = "/", rowSums(cnt_raw))
+  # compute relative frequencies within spots
+  cnt_raw <- prop.table(cnt_raw, 1)
+
+  if(use.log)
+    cnt_raw <- log(cnt_raw)
 
   # extract spots present in feature and count file
   interspt <- as.character(intersect(rownames(feat),rownames(cnt_raw)))
