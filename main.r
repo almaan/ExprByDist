@@ -460,9 +460,13 @@ for (filenum in c(1:length(st_cnt_files))){
   cnt[,inter] <- cnt_raw[,inter]
   remove(cnt_raw) # free up memory
   
+  idx_inner <- which(feat$tumor == inner_tag)
+  idx_outer <- which(feat$tumor == outer_tag)
+  iter_idx <- cb(idx_inner,idx_outer)
+  
   # get tumor and non-tumor spot coordinates
-  innerspts <- feat[feat$tumor == inner_tag,c('xcoord','ycoord')] # within reference tissue
-  outerspts <- feat[feat$tumor == outer_tag,c('xcoord','ycoord')] # outside referene tissue
+  innerspts <- feat[idx_intter,c('xcoord','ycoord')] # within reference tissue
+  outerspts <- feat[idx_outer,c('xcoord','ycoord')] # outside referene tissue
   
   # create distance matrix (euclidian distance)
   dmat = crossdist.default(X = outerspts[,1], # target spots along dim 1
@@ -474,8 +478,12 @@ for (filenum in c(1:length(st_cnt_files))){
   colnames(dmat) = rownames(innerspts)
   
   # get minimum distance to a tumor spot for each non-tumor spot
-  mindist_ref <- apply(dmat, 2, min) # minimum distance to nearest target spot for all reference spots
+  mindist_ref <- -1*apply(dmat, 2, min) # minimum distance to nearest target spot for all reference spots
   mindist_trgt <- apply(dmat, 1, min) # minimum distance to nearest reference spot for all target spots
+  joint_dist <- c(mindist_ref,mindist_trgt)
+  
+  
+  
   
   # get expression levels for spots within reference tissue
   for (jj in c(1:length(lims))) {
@@ -577,5 +585,4 @@ viz <- ggplot(data = exprval, aes(x = distance, y = expr, color = gene)) +
   theme(plot.title = element_text(hjust = 0.5))
 
 print(viz)
-
 dev.off()
