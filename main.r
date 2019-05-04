@@ -238,18 +238,13 @@ if (interactive()) {
                   'exdata/ft-00001_X3.tsv')
 
   dge_pth <- NULL
- # polydeg <- 5
-#  loess_span <- 0.5
   outer_tag <- 'non'
   inner_tag <- 'tumor'
   positive_lfc <- T
   negative_lfc <- T
- # method = 'loess'
-  use.log <- FALSE
+  use.log <- TRUE
   main_title <- "test"
   use_genes <- c("ERBB2","MZB1")
-#  use_standard_error <- T
-  use_se <- F
   use_control <- TRUE
   odir <- paste(c(getwd(),'exprbydist'), collapse = '/')
 
@@ -260,18 +255,13 @@ if (interactive()) {
   feat_files <- args$feature_files
   dge_pth <- args$dge_res
   genes_pth <- args$dge_res
- # polydeg <- args$polydeg
   use.log <- args$log
   main_title <- args$title
   outer_tag <- args$outer_tag
   inner_tag <- args$inner_tag
-#  method <- args$method
-#  loess_span <- args$loess_span
   positive_lfc <- args$positive_lfc
   negative_lfc <- args$negative_lfc
-#  z_transform <- args$z_transform
   use_genes <- args$genes
-#  use_se <- args$standard_error
   use_control <- args$no_control
   odir <- args$outdir
 }
@@ -413,20 +403,12 @@ if (!(is.null(dge_pth))) {
   imgpth <- paste(c(odir,bname),collapse = '/')
 }
 
-mx <- 60 #  maximum distance from distance from tumor spot
-dr <- 0.1 #  distance increment
-lims <- seq(1-dr,mx+dr,dr) #  lower limits
-meanpnt <- lims + dr/2.0 #  mean point within each interval
 
-# dataframe to hold mean expression values for each distance value
-data <- list()
-
-
-
+data <- data.frame(matrix(NA,ncol = (length(genes) + 1)))
+colnames(data) <- c('distance',genes)
 # iterate over all filenames
 flog.info('Read data from files')
 for (filenum in c(1:length(st_cnt_files))){
-  
   
   st_cnt_pth <- st_cnt_files[filenum]
   feat_pth <- feat_files[filenum]
@@ -446,13 +428,11 @@ for (filenum in c(1:length(st_cnt_files))){
   # compute relative frequencies within spots
   cnt_raw <- prop.table(cnt_raw, 1)
 
-  if(use.log)
-    cnt_raw <- log(cnt_raw)
-
   # extract spots present in feature and count file
   interspt <- as.character(intersect(rownames(feat),rownames(cnt_raw)))
   cnt_raw <- cnt_raw[interspt,]
   feat <- feat[interspt,]
+  
   
   # create matrix with all as columns genes
   cnt <- data.frame(matrix(0, nrow = nrow(cnt_raw),ncol = length(genes)))
@@ -474,10 +454,10 @@ for (filenum in c(1:length(st_cnt_files))){
   
   idx_inner <- which(feat$tumor == inner_tag)
   idx_outer <- which(feat$tumor == outer_tag)
-  iter_idx <- cb(idx_inner,idx_outer)
+  joint_idx <- c(idx_inner,idx_outer)
   
   # get tumor and non-tumor spot coordinates
-  innerspts <- feat[idx_intter,c('xcoord','ycoord')] # within reference tissue
+  innerspts <- feat[idx_inner,c('xcoord','ycoord')] # within reference tissue
   outerspts <- feat[idx_outer,c('xcoord','ycoord')] # outside referene tissue
   
   # create distance matrix (euclidian distance)
@@ -494,85 +474,36 @@ for (filenum in c(1:length(st_cnt_files))){
   mindist_trgt <- apply(dmat, 1, min) # minimum distance to nearest reference spot for all target spots
   joint_dist <- c(mindist_ref,mindist_trgt)
   
-  
-  
-  
-  # get expression levels for spots within reference tissue
-  for (jj in c(1:length(lims))) {
-    # find spots with mindist within I = [lim,lim+dr)
-    idx_within_ref <- (mindist_ref >= lims[jj]) & (mindist_ref < lims[jj] + dr) 
-    # get count matrix index for spots within I = [lim,lim+dr)
-    spt_within_ref <- which(rownames(cnt) %in% colnames(dmat)[idx_within_ref])
-    # if I is non-empty
-    if (length(spt_within_ref) > 0) {
-      pos <- (length(lims) - jj)
-      cr <- cnt[spt_within_ref,]
-      colnames(cr) <- symbol
-      cr['distance'] <- (-1)*as.double(lims[jj])
-      # add mean of observed counts taken over points within I
-      if (pos %in% names(data)) {
-        data[[pos]] <- rbind(data[[pos]],cr)  
-      } else {
-        data[[pos]] <-  cr
-      }
-       
-    }
-  }
-  
-  # get expression levels for spots within target tissue
-  for (ii in c(1:length(lims))) {
-    # find spots with mindist within I = [lim,lim+dr)
-    idx_within_trgt <- (mindist_trgt >= lims[ii]) & (mindist_trgt < lims[ii] + dr) 
-    # get count matrix index for spots within I = [lim,lim+dr)
-    spt_within_trgt <- which(rownames(cnt) %in% rownames(dmat)[idx_within_trgt]) #  
-    if (length(spt_within_trgt) > 0) {
-      pos <- (length(lims) + ii)
-      ct <- cnt[spt_within_trgt,]
-      colnames(ct) <- symbol
-      ct['distance'] <- as.double(lims[ii])
-      # add mean of observed counts taken over points within I
-      if (pos %in% names(data)) {
-        data[[pos]] <- rbind(data[[pos]],ct) 
-      } else {
-        data[[pos]] <- ct
-      }
-    }
-  }
-
+  tmpdata <- cbind(data.frame(distance = joint_dist),cnt[joint_idx,inter])
+  rownames(tmpdata) <- c(nrow(data):(nrow(data)+nrow(tmpdata) -1))
+  data <- rbind(data,tmpdata)
 }
 
-data <- data[!unlist(lapply(data, is.null))]
+data <- data[-1,]
 longformat <- melt(data, id = 'distance')
-colnames(longformat) <- c("distance","gene","expr","section")
+colnames(longformat) <- c("distance","gene","expr")
+if (use.log){
+  longformat <- longformat[longformat$expr > 0,]
+  longformat$expr <- log(longformat$expr)
+}
 
 unigenes <- unique(longformat$gene)
 
-pd <- seq(min(longformat$dist),max(longformat$dist),dr) + dr/2.0
-exprval <- data.frame(matrix(0,nrow = length(pd), ncol = length(unigenes)))
-errval <- data.frame(matrix(0,nrow = nrow(exprval), ncol = ncol(exprval)))
-
+pd <- seq(min(longformat$dist),max(longformat$dist),0.01)
 colnames(exprval) <- unigenes
 colnames(errval) <- unigenes
-rownames(exprval) <- pd
-rownames(errval) <- pd
 
 # Plot Results -------------------------
-
+preddata <- data.frame(distance = NA, gene = NA, expr = NA, sd = NA)
 for (gene in unigenes) {
   genpos <- which(longformat$gene == gene)
   fit <- gausspr(longformat[genpos,]$dist, longformat[genpos,]$expr, type = 'regression', variance.model = TRUE)
   ypred <- predict(fit,pd)
   ypredsd <- predict(fit,pd, type = 'sdeviation')
-  exprval[gene] <-ypred
-  errval[gene] <- 2.0*ypredsd 
+  tmpdata <- data.frame(distance = pd, gene = rep(gene,length(pd)),expr = ypred, sd = ypredsd)
+  preddata <- rbind(preddata, tmpdata)
 }
-exprval$distance <- pd
-errval$distance <- pd
-exprval <- melt(exprval, id = 'distance')
-errval <- melt(errval, id = 'distance')
-exprval['sd_low'] <- as.numeric(exprval$value) - as.numeric(errval$value)
-exprval['sd_high'] <- as.numeric(exprval$value) + as.numeric(errval$value)
-colnames(exprval) <- c('distance','gene','expr','sd_low','sd_high')
+preddata <- preddata[-1,]
 
 if (is.null(main_title)) {
   plt_title <- bname
@@ -585,13 +516,13 @@ png(paste(c(imgpth,"count_by_distance.png"),collapse = '.'),
     width = 1000,
     height = 500)
 
-viz <- ggplot(data = exprval, aes(x = distance, y = expr, color = gene)) +
+viz <- ggplot(data = preddata, aes(x = distance, y = expr, color = gene)) +
   ggtitle(plt_title) +
   geom_line() +
-  geom_errorbar(width = 0.1, aes(ymin = sd_low, ymax = sd_high), alpha = 0.4) +
+  geom_errorbar(width = 0.1, aes(ymin = -2*sd+expr, ymax = 2*sd+expr), alpha = 0.1) +
   annotate('rect', xmin = -Inf, xmax = 0, ymin = -Inf, ymax = Inf, fill = "red", color = NA, alpha = 0.1) + 
   annotate('rect', xmin = 0, xmax = Inf, ymin = -Inf, ymax = Inf, fill = "green", color = NA, alpha = 0.1) +
-  scale_color_manual(values=cmap) +
+#  scale_color_manual(values=cmap) +
   xlab('Distance') +
   ylab('Relative Expression') +
   theme(plot.title = element_text(hjust = 0.5))
